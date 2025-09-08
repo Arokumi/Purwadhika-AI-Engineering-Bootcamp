@@ -1,37 +1,41 @@
-import curses
-
-MENU = ["List Cars", "Rent a Car", "My Rentals", "Statistics", "Quit"]
-
-
-def draw_menu(stdscr, idx):
-    stdscr.clear()
-    stdscr.addstr(0, 2, "Car Rental — Admin", curses.A_BOLD)
-    for i, item in enumerate(MENU, start=2):
-        attr = curses.A_REVERSE if (i - 2) == idx else curses.A_NORMAL
-        stdscr.addstr(i, 4, item, attr)
-    stdscr.refresh()
+from textual.app import App, ComposeResult
+from textual.containers import HorizontalGroup, VerticalScroll
+from textual.widgets import Button, Digits, Footer, Header
 
 
-def main(stdscr):
-    curses.curs_set(0)
-    stdscr.keypad(True)
-    idx = 0
-    while True:
-        draw_menu(stdscr, idx)
-        key = stdscr.getch()
-        if key in (curses.KEY_UP, ord("k")):
-            idx = (idx - 1) % len(MENU)
-        elif key in (curses.KEY_DOWN, ord("j")):
-            idx = (idx + 1) % len(MENU)
-        elif key in (curses.KEY_ENTER, 10, 13):
-            choice = MENU[idx]
-            if choice == "Quit":
-                break
-            # call your core functions here, then show a sub-screen
-            # e.g., show_list_cars(stdscr) that renders a table
-        elif key == 27:  # ESC
-            break
+class TimeDisplay(Digits):
+    """A widget to display elapsed time."""
+
+
+class Stopwatch(HorizontalGroup):
+    """A stopwatch widget."""
+
+    def compose(self) -> ComposeResult:
+        """Create child widgets of a stopwatch."""
+        yield Button("Start", id="start", variant="success")
+        yield Button("Stop", id="stop", variant="error")
+        yield Button("Reset", id="reset")
+        yield TimeDisplay("00:00:00.00")
+
+
+class StopwatchApp(App):
+    """A Textual app to manage stopwatches."""
+
+    BINDINGS = [("d", "toggle_dark", "Toggle dark mode")]
+
+    def compose(self) -> ComposeResult:
+        """Create child widgets for the app."""
+        yield Header()
+        yield Footer()
+        yield VerticalScroll(Stopwatch(), Stopwatch(), Stopwatch())
+
+    def action_toggle_dark(self) -> None:
+        """An action to toggle dark mode."""
+        self.theme = (
+            "textual-dark" if self.theme == "textual-light" else "textual-light"
+        )
 
 
 if __name__ == "__main__":
-    curses.wrapper(main)
+    app = StopwatchApp()
+    app.run()

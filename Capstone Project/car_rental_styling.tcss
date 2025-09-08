@@ -1,0 +1,14 @@
+DataTable {
+    dock: left;
+    width: 45%;   /* half the space */
+    height: 80%;
+    margin: 5;
+}
+
+Placeholder {
+    dock: right;
+    width: 45%;   /* half the space */
+    height: 80%;
+    margin: 5;
+}
+
