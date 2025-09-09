@@ -1,6 +1,4 @@
 # Core Python
-import os
-import sys
 import hashlib
 import datetime
 from datetime import datetime
@@ -24,8 +22,8 @@ from textual.widgets import (
     Select,
     Label,
 )
-from textual.containers import HorizontalGroup, VerticalScroll
 from textual.screen import Screen, ModalScreen
+from textual_plotext import PlotextPlot
 
 
 # =========================================  CORE FUNCTIONS  =========================================
@@ -153,7 +151,8 @@ def getTopEmployees():
         LEFT JOIN rentals r ON employee_id  = renter_id
         LEFT JOIN cars    c ON r.vehicle_id = car_id
         GROUP BY  e.employee_name
-        ORDER BY  total_revenue DESC;
+        ORDER BY  total_revenue DESC
+        LIMIT 6;
         """
     cursor.execute(command)
 
@@ -165,7 +164,8 @@ def getTopCategory():
         FROM cars c
         JOIN rentals r ON c.car_id = r.vehicle_id
         GROUP BY c.car_category
-        ORDER BY total_cars DESC;
+        ORDER BY total_cars DESC
+        LIMIT 6;
         """
     cursor.execute(command)
 
@@ -177,7 +177,8 @@ def getTopModel():
         FROM cars c
         JOIN rentals r ON c.car_id = r.vehicle_id
         GROUP BY c.car_make, c.car_model
-        ORDER BY total_cars DESC;
+        ORDER BY total_cars DESC
+        LIMIT 6;
         """
     cursor.execute(command)
 
@@ -230,6 +231,22 @@ def getAverageRevenue():
     return cursor.fetchall()
 
 
+def getDateDifference():
+    command = "SELECT datediff(rental_end, rental_start) AS usage_length FROM rentals;"
+    cursor.execute(command)
+
+    return cursor.fetchall()
+
+
+def getDateAverage():
+    command = (
+        "SELECT AVG(datediff(rental_end, rental_start)) AS usage_length FROM rentals;"
+    )
+    cursor.execute(command)
+
+    return cursor.fetchall()
+
+
 # =========================================  TEXTUAL  =========================================
 
 
@@ -261,7 +278,7 @@ class CarRentalService(Screen):
         ("4", "show_rentals", "Rentals"),
     ]
 
-    CSS_PATH = "D:\Github\Purwadhika-AI-Engineering-Bootcamp\Capstone Project\car_rental_styling.tcss"
+    CSS_PATH = "car_rental_styling.tcss"
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -301,86 +318,97 @@ class EmployeesScreen(Screen):
     BINDINGS = [
         ("b,escape", "app.pop_screen", "Back"),
         ("a", "add_new", "New"),
+        ("1", "get_top", "Top Employees"),
     ]
 
     def compose(self) -> ComposeResult:
         yield Header()
         yield Footer()
         yield DataTable()
-        yield Placeholder("This will be the graph")
+        yield PlotextPlot()
 
     def on_mount(self, result=None) -> None:
-        table = self.reset_table()
-        table.add_columns(
+        columns = [
             "Employee ID",
             "Employee Names",
             "Employee Password",
             "Employee Comission Rate",
-        )
-        table.add_rows(getEmployees())
+        ]
+        setTable(self, columns, getEmployees())
+        self.query_one(DataTable).focus()
 
     def action_add_new(self) -> None:
         self.app.push_screen(AddEmployeeModal(), self.on_mount)
 
-    def reset_table(self) -> DataTable:
-        old_table = self.query_one(DataTable)
-        parent = old_table.parent
-        old_table.remove()
+    def action_get_top(self) -> None:
+        data = getTopEmployees()
+        columns = ["Employee Name", "Revenue Produced"]
+        setTable(self, columns, data)
 
-        new_table = DataTable()
-        parent.mount(new_table)
-        return new_table
+        names = [name for name, _ in data]
+        revenue = [float(revenue) for _, revenue in data]
+
+        makeBar(
+            self, names, revenue, "h", "Employee", "Revenue produced", "Top Employees"
+        )
 
 
 class UsersScreen(Screen):
     BINDINGS = [
         ("b,escape", "app.pop_screen", "Back"),
         ("a", "add_new", "New"),
+        ("1", "get_top", "Top Spender"),
     ]
 
     def compose(self) -> ComposeResult:
         yield Header()
         yield Footer()
         yield DataTable()
-        yield Placeholder("This will be the graph")
+        yield PlotextPlot()
 
     def on_mount(self, result=None) -> None:
-        table = self.reset_table()
-        table.add_columns(
+        columns = [
             "User ID",
             "User Names",
             "User Password",
-        )
-        table.add_rows(getUsers())
+        ]
+        setTable(self, columns, getUsers())
+        self.query_one(PlotextPlot).plt.clear_figure
+        self.query_one(DataTable).focus()
 
     def action_add_new(self) -> None:
         self.app.push_screen(AddUserModal(), self.on_mount)
 
-    def reset_table(self) -> DataTable:
-        old_table = self.query_one(DataTable)
-        parent = old_table.parent
-        old_table.remove()
+    def action_get_top(self) -> None:
+        spenders = getTopSpender()
+        columns = ["User", "Amount Spent"]
+        setTable(self, columns, spenders)
 
-        new_table = DataTable()
-        parent.mount(new_table)
-        return new_table
+        users = [name for name, _ in spenders][::-1]
+        amount = [float(amount) for _, amount in spenders][::-1]
+
+        makeBar(
+            self, users, amount, "h", "Users", "Total Spent", "Total Spending of Users"
+        )
 
 
 class CarsScreen(Screen):
     BINDINGS = [
         ("b,escape", "app.pop_screen", "Back"),
         ("a", "add_new", "New Car"),
+        ("1", "get_top_category", "Top Category"),
+        ("2", "get_top_model", "Top Model"),
+        ("3", "get_util_rate", "Utilization Rate"),
     ]
 
     def compose(self) -> ComposeResult:
         yield Header()
         yield Footer()
         yield DataTable()
-        yield Placeholder("This will be the graph")
+        yield PlotextPlot()
 
     def on_mount(self, result=None) -> None:
-        table = self.reset_table()
-        table.add_columns(
+        columns = [
             "Car ID",
             "Car Plate",
             "Car Make",
@@ -389,20 +417,42 @@ class CarsScreen(Screen):
             "Car Year",
             "Car Km",
             "Car Fee (per day)",
-        )
-        table.add_rows(getCars())
+        ]
+
+        setTable(self, columns, getCars())
+        self.query_one(PlotextPlot).plt.clear_figure
+        self.query_one(DataTable).focus()
 
     def action_add_new(self) -> None:
         self.app.push_screen(AddCarModal(), self.on_mount)
 
-    def reset_table(self) -> DataTable:
-        old_table = self.query_one(DataTable)
-        parent = old_table.parent
-        old_table.remove()
+    def action_get_top_category(self) -> None:
+        data = getTopCategory()
+        columns = ["Car Category", "Total Cars"]
+        setTable(self, columns, data)
 
-        new_table = DataTable()
-        parent.mount(new_table)
-        return new_table
+        category = [category for category, _ in data][::-1]
+        amount = [amount for _, amount in data][::-1]
+
+        makeBar(
+            self, category, amount, "v", "Car Category", "Amount", "Top Car Categories"
+        )
+
+    def action_get_top_model(self) -> None:
+        data = getTopModel()
+        columns = ["Car Make", "Car Model", "Car Count"]
+        setTable(self, columns, data)
+
+        cars = [f"{make} {model}" for make, model, _ in data]
+        amount = [amount for _, _, amount in data]
+
+        makeBar(self, cars, amount, "v", "Cars", "Amount", "Top Car Models")
+
+    def action_get_util_rate(self) -> None:
+        columns = ["Car ID", "Car Plate", "Car Make", "Car Model", "Car Util Rate"]
+        setTable(self, columns, getUtilizationRate())
+
+        self.query_one(PlotextPlot).plt.clear_figure
 
 
 class RentalsScreen(Screen):
@@ -410,17 +460,17 @@ class RentalsScreen(Screen):
         ("b,escape", "app.pop_screen", "Back"),
         ("a", "add_new", "New"),
         ("1", "rev_stats", "Get Revenues"),
+        ("2", "get_distribution", "Average Days Rented"),
     ]
 
     def compose(self) -> ComposeResult:
         yield Header()
         yield Footer()
         yield DataTable()
-        yield Placeholder("This will be the graph")
+        yield PlotextPlot()
 
     def on_mount(self, result=None) -> None:
-        table = self.reset_table()
-        table.add_columns(
+        columns = [
             "Rental ID",
             "Renter Names",
             "Rentee Names",
@@ -428,8 +478,11 @@ class RentalsScreen(Screen):
             "Car Plate Number",
             "Rental Start Date",
             "Rental End Date",
-        )
-        table.add_rows(getRentals())
+        ]
+
+        setTable(self, columns, getRentals())
+        self.query_one(PlotextPlot).plt.clear_figure
+        self.query_one(DataTable).focus()
 
     def action_add_new(self) -> None:
         self.app.push_screen(AddRentalModal(), self.on_mount)
@@ -437,14 +490,26 @@ class RentalsScreen(Screen):
     def action_rev_stats(self) -> None:
         self.app.push_screen(ShowRevenueStatistics())
 
-    def reset_table(self) -> DataTable:
-        old_table = self.query_one(DataTable)
-        parent = old_table.parent
-        old_table.remove()
+    def action_get_distribution(self) -> None:
+        table = resetTable(self)
+        table.add_columns("Average Days Rented")
+        table.add_rows(getDateAverage())
 
-        new_table = DataTable()
-        parent.mount(new_table)
-        return new_table
+        plot = self.query_one(PlotextPlot)
+        plt = plot.plt
+        data = np.array([x[0] for x in getDateDifference()])
+        mean = np.mean(data)
+        std_dev = np.std(data)
+
+        x = np.linspace(mean - 4 * std_dev, mean + 4 * std_dev, 100)
+        y = gaussianPDF(x, mean, std_dev)
+
+        plt.plot(x, y, label=f"Gaussian (μ={mean}, σ={std_dev})")
+        plt.title("Gaussian Distribution of Days Rented")
+        plt.xlabel("X-axis")
+        plt.ylabel("Probability Density")
+
+        plot.refresh()
 
 
 # ======================== MODAL SCREENS ========================
@@ -703,6 +768,66 @@ class ShowRevenueStatistics(ModalScreen):
 
 def getHash(String) -> str:
     return hashlib.sha256(String.encode("utf-8")).hexdigest()
+
+
+def resetTable(self) -> DataTable:
+    old_table = self.query_one(DataTable)
+    parent = old_table.parent
+    old_table.remove()
+
+    new_table = DataTable()
+    parent.mount(new_table)
+    return new_table
+
+
+def gaussianPDF(x, mu, sigma):
+    return (1 / (sigma * np.sqrt(2 * np.pi))) * np.exp(-0.5 * ((x - mu) / sigma) ** 2)
+
+
+def setTable(self, columns, rows) -> None:
+    table = resetTable(self)
+    table.add_columns(*columns)
+    table.add_rows(rows)
+
+
+def makeBar(
+    self,
+    category,
+    value,
+    orientation="v",
+    category_name="Category",
+    value_name="Value",
+    title="Title",
+) -> None:
+
+    # users = [name for name, _ in spenders][::-1]
+    # amount = [float(amount) for _, amount in spenders][::-1]
+
+    plot = self.query_one(PlotextPlot)
+    plt = plot.plt
+    plt.clear_figure()
+
+    if orientation == "h":
+        ypos = [int(i) * 0.1 for i in range(1, len(category) + 1)]
+        plt.bar(ypos, value, orientation="h", width=0.1)
+        plt.yticks(ypos, list(category))
+        plt.xlim(0, max(value) * 1.1)
+
+        plt.ylabel(category_name)
+        plt.xlabel(value_name)
+
+    elif orientation == "v":
+        xpos = [int(i) * 0.1 for i in range(1, len(category) + 1)]
+        plt.bar(xpos, value, orientation="v", width=0.1)
+        plt.xticks(xpos, list(category))
+        plt.ylim(0, max(value) * 1.1)
+
+        plt.ylabel(value_name)
+        plt.xlabel(category_name)
+
+    plt.title(title)
+
+    plot.refresh()
 
 
 if __name__ == "__main__":
