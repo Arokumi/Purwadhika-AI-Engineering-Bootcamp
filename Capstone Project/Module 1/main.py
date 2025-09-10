@@ -22,44 +22,36 @@ from textual.widgets import (
     Select,
     Label,
 )
+from textual.containers import Vertical, VerticalScroll, Horizontal
 from textual.screen import Screen, ModalScreen
 from textual_plotext import PlotextPlot
-
-
-# =========================================  CORE FUNCTIONS  =========================================
 
 mydb = mysql.connector.connect(
     host="localhost", user="root", password="ArhamAlfa123", database="car_rentals"
 )
 cursor = mydb.cursor()
 
+# =========================================  CORE FUNCTIONS  =========================================
 
-def login(username, password):
-    cursor.execute("SELECT user_name, user_password from users")
-    users = cursor.fetchall()
+
+def login(username, password) -> tuple:
     cursor.execute("SELECT employee_name, employee_password from employees")
     employees = cursor.fetchall()
+    _password = getHash(password)
 
-    # If normal user
-    for user in users:
-        if username == user[0]:
-            if password == user[1]:
-                return {True: "user"}  # User exists and password was correct
-            else:
-                return {False: None}  # User exists but password was incorrect
-
-    # Else if employee
     for employee in employees:
         if username == employee[0]:
-            if password == employee[1]:
-                return {True: "employee"}  # Employee exists and password was correct
+            if _password == employee[1]:
+                return (True, "Employee has been logged in.")
             else:
-                return {False: None}  # Employee exists but password was incorrect
+                return (False, "Your password was incorrect.")
 
-    return None  # User does not exist
+    return (False, "That employee does not exist.")
 
 
 # ======================== SETTER FUNCTIONS ========================
+
+
 def addCar(
     car_plate, car_make, car_model, car_category, car_year, car_km, car_fee
 ) -> tuple:
@@ -80,7 +72,7 @@ def addUser(user_name, user_password) -> tuple:
     else:
         command = "INSERT INTO users (user_name, user_password) values (%s, %s)"
         cursor.execute(command, values)
-        mydb.commit
+        mydb.commit()
         return (True, "User has been added.")
 
 
@@ -94,7 +86,7 @@ def addEmployee(employee_name, employee_password, employee_commission) -> tuple:
     else:
         command = "INSERT INTO employees (employee_name, employee_password, employee_commission) values (%s, %s, %s);"
         cursor.execute(command, values)
-        mydb.commit
+        mydb.commit()
         return (True, "User has been added.")
 
 
@@ -117,6 +109,8 @@ def addRental(renter_id, rentee_id, vehicle_id, rental_start, rental_end) -> tup
 
 
 # ======================== GETTER FUNCTIONS ========================
+
+
 def getCars() -> list[tuple]:
     cursor.execute("SELECT * FROM cars;")
     return cursor.fetchall()
@@ -144,6 +138,8 @@ def getRentals() -> list[tuple]:
 
 
 # ======================== STATISTIC FUNCTIONS ========================
+
+
 def getTopEmployees():
     command = """SELECT e.employee_name,
         SUM(datediff(r.rental_end, r.rental_start) * c.car_fee) AS total_revenue
@@ -266,8 +262,39 @@ class Homescreen(App):
         ("q", "quit", "Quit"),
     ]
 
+    CSS_PATH = "car_rental_styling.tcss"
+
+    def compose(self):
+        with VerticalScroll(id="initial_login"):
+            yield Label("Login to an Account", id="title")
+
+            yield Label("Employee Name", id="username")
+            yield Input(placeholder="e.g., Bob", id="username_input")
+
+            yield Label("Password", id="password")
+            yield Input(id="password_input", password=True)
+
+            with Horizontal():
+                yield Button("Submit", id="submit", variant="primary")
+
+            yield Label("", id="result")
+
     def on_mount(self) -> None:
+        self.query_one("#username_input", Input).focus()
+
+    def action_submit(self) -> None:
         self.push_screen(CarRentalService())
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        username = self.query_one("#username_input", Input).value
+        password = self.query_one("#password_input", Input).value
+
+        result = login(username, password)
+
+        if result[0]:
+            self.action_submit()
+        else:
+            self.query_one("#result", Label).update(result[1])
 
 
 class CarRentalService(Screen):
@@ -277,8 +304,6 @@ class CarRentalService(Screen):
         ("3", "show_cars", "Cars"),
         ("4", "show_rentals", "Rentals"),
     ]
-
-    CSS_PATH = "car_rental_styling.tcss"
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -336,6 +361,7 @@ class EmployeesScreen(Screen):
         ]
         setTable(self, columns, getEmployees())
         self.query_one(DataTable).focus()
+        self.app.refresh_bindings()
 
     def action_add_new(self) -> None:
         self.app.push_screen(AddEmployeeModal(), self.on_mount)
@@ -355,7 +381,7 @@ class EmployeesScreen(Screen):
 
 class UsersScreen(Screen):
     BINDINGS = [
-        ("b,escape", "app.pop_screen", "Back"),
+        ("b", "app.pop_screen", "Back"),
         ("a", "add_new", "New"),
         ("1", "get_top", "Top Spender"),
     ]
@@ -373,8 +399,8 @@ class UsersScreen(Screen):
             "User Password",
         ]
         setTable(self, columns, getUsers())
-        self.query_one(PlotextPlot).plt.clear_figure
         self.query_one(DataTable).focus()
+        self.app.refresh_bindings()
 
     def action_add_new(self) -> None:
         self.app.push_screen(AddUserModal(), self.on_mount)
@@ -422,6 +448,7 @@ class CarsScreen(Screen):
         setTable(self, columns, getCars())
         self.query_one(PlotextPlot).plt.clear_figure
         self.query_one(DataTable).focus()
+        self.app.refresh_bindings()
 
     def action_add_new(self) -> None:
         self.app.push_screen(AddCarModal(), self.on_mount)
@@ -481,8 +508,8 @@ class RentalsScreen(Screen):
         ]
 
         setTable(self, columns, getRentals())
-        self.query_one(PlotextPlot).plt.clear_figure
         self.query_one(DataTable).focus()
+        self.app.refresh_bindings()
 
     def action_add_new(self) -> None:
         self.app.push_screen(AddRentalModal(), self.on_mount)
@@ -522,21 +549,36 @@ class AddEmployeeModal(ModalScreen):
     ]
 
     def compose(self) -> ComposeResult:
-        yield Label("Add Employee", id="title")
+        with Vertical(classes="dialog"):
 
-        yield Label("Employee Name")
-        yield Input(placeholder="e.g., Bob", id="employee_name")
+            with VerticalScroll(id="form"):
+                yield Label("Add Employee", id="title")
 
-        yield Label("Password")
-        yield Input(placeholder="••••••••", id="employee_password", password=True)
+                yield Label("Employee Name", classes="field-label")
+                yield Input(
+                    placeholder="e.g., Bob", id="employee_name", classes="field-input"
+                )
 
-        yield Label("Commission Rate")
-        yield Input(placeholder="e.g. 0.4", id="employee_commission")
+                yield Label("Password", classes="field-label")
+                yield Input(
+                    placeholder="••••••••",
+                    id="employee_password",
+                    password=True,
+                    classes="field-input",
+                )
 
-        yield Button("Submit", id="submit", variant="primary")
-        yield Button("Cancel", id="cancel")
+                yield Label("Commission Rate", classes="field-label")
+                yield Input(
+                    placeholder="e.g. 0.4",
+                    id="employee_commission",
+                    classes="field-input",
+                )
 
-        yield Label("", id="result")
+            with Horizontal(id="buttons"):
+                yield Button("Submit", id="submit", variant="primary")
+                yield Button("Cancel", id="cancel")
+
+            yield Label("", id="result")
 
     def on_mount(self) -> None:
         self.query_one("#employee_name", Input).focus()
@@ -548,20 +590,25 @@ class AddEmployeeModal(ModalScreen):
             self.query_one("#employee_commission", Input).value,
         )
 
-        result = addEmployee(*vals)
-
-        if result[0]:
-            self.dismiss()
+        if "" in vals:
+            self.query_one("#result", Label).update("Please enter all data.")
         else:
-            self.query_one("#result", Label).update(result[1])
+            result = addEmployee(*vals)
+
+            if result[0]:
+                self.dismiss()
+            else:
+                self.query_one("#result", Label).update(result[1])
 
     def action_cancel(self) -> None:
         self.dismiss()
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "submit":
+            event.stop()
             self.action_submit()
         else:
+            event.stop()
             self.action_cancel()
 
 
@@ -572,18 +619,31 @@ class AddUserModal(ModalScreen):
     ]
 
     def compose(self) -> ComposeResult:
-        yield Label("Add User", id="title")
+        with Vertical(classes="dialog"):
 
-        yield Label("User Name")
-        yield Input(placeholder="e.g., alice", id="user_name")
+            with VerticalScroll(id="form"):
+                yield Label("Add User", id="title")
 
-        yield Label("Password")
-        yield Input(placeholder="••••••••", id="user_password", password=True)
+                yield Label("User Name", classes="field-label")
+                yield Input(
+                    placeholder="e.g., Alice", id="user_name", classes="field-input"
+                )
 
-        yield Button("Submit", id="submit", variant="primary")
-        yield Button("Cancel", id="cancel")
+                yield Label("Password", classes="field-label")
+                yield Input(
+                    placeholder="••••••••",
+                    id="user_password",
+                    classes="field-input",
+                    password=True,
+                )
 
-        yield Label("", id="result")
+            with Horizontal(id="buttons"):
+                yield Button(
+                    "Submit", id="submit", variant="primary", classes="modal-btn"
+                )
+                yield Button("Cancel", id="cancel", classes="modal-btn")
+
+            yield Label("", id="result")
 
     def on_mount(self) -> None:
         self.query_one("#user_name", Input).focus()
@@ -594,20 +654,25 @@ class AddUserModal(ModalScreen):
             getHash(self.query_one("#user_password", Input).value),
         )
 
-        result = addUser(*vals)
-
-        if result[0]:
-            self.dismiss()
+        if "" in vals:
+            self.query_one("#result", Label).update("Please enter all data.")
         else:
-            self.query_one("#result", Label).update(result[1])
+            result = addUser(*vals)
+
+            if result[0]:
+                self.dismiss()
+            else:
+                self.query_one("#result", Label).update(result[1])
 
     def action_cancel(self) -> None:
         self.dismiss()
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "submit":
+            event.stop()
             self.action_submit()
         else:
+            event.stop()
             self.action_cancel()
 
 
@@ -618,36 +683,55 @@ class AddCarModal(ModalScreen):
     ]
 
     def compose(self) -> ComposeResult:
-        yield Label("Add Car", id="title")
+        with Vertical(classes="dialog"):
 
-        yield Label("Car Make")
-        yield Input(placeholder="e.g., Toyota", id="car_make")
+            with VerticalScroll(id="form"):
+                yield Label("Add Car", id="title")
 
-        yield Label("Car Model")
-        yield Input(placeholder="e.g., Corolla", id="car_model")
+                yield Label("Car Make", classes="field-label")
+                yield Input(
+                    placeholder="e.g., Toyota", id="car_make", classes="field-input"
+                )
 
-        yield Label("Category")
-        yield Input(
-            placeholder="e.g., Budget ~ Rp 400,000 - Rp 600,000 / Family ~ Rp 650,000 - Rp 1,000,000 / Luxury ~ Rp 1,200,000 - Rp 2,000,000",
-            id="car_category",
-        )
+                yield Label("Car Model", classes="field-label")
+                yield Input(
+                    placeholder="e.g., Corolla", id="car_model", classes="field-input"
+                )
 
-        yield Label("Car Plate")
-        yield Input(placeholder="e.g., B 1039 SJW", id="car_plate")
+                yield Label("Category", classes="field-label")
+                yield Input(
+                    placeholder="e.g., Budget ~ Rp 400,000 - Rp 600,000 / Family ~ Rp 650,000 - Rp 1,000,000 / Luxury ~ Rp 1,200,000 - Rp 2,000,000",
+                    id="car_category",
+                    classes="field-input",
+                )
 
-        yield Label("Year")
-        yield Input(placeholder="e.g., 2019", id="car_year")
+                yield Label("Car Plate", classes="field-label")
+                yield Input(
+                    placeholder="e.g., B 1039 SJW",
+                    id="car_plate",
+                    classes="field-input",
+                )
 
-        yield Label("Kilometers")
-        yield Input(placeholder="e.g., 45000", id="car_km")
+                yield Label("Year", classes="field-label")
+                yield Input(
+                    placeholder="e.g., 2019", id="car_year", classes="field-input"
+                )
 
-        yield Label("Fee")
-        yield Input(placeholder="e.g., 500000", id="car_fee")
+                yield Label("Kilometers", classes="field-label")
+                yield Input(
+                    placeholder="e.g., 45000", id="car_km", classes="field-input"
+                )
 
-        yield Button("Submit", id="submit", variant="primary")
-        yield Button("Cancel", id="cancel")
+                yield Label("Fee", classes="field-label")
+                yield Input(
+                    placeholder="e.g., 500000", id="car_fee", classes="field-input"
+                )
 
-        yield Label("", id="result")
+            with Horizontal(id="buttons"):
+                yield Button("Submit", id="submit", variant="primary")
+                yield Button("Cancel", id="cancel")
+
+            yield Label("", id="result")
 
     def on_mount(self) -> None:
         self.query_one("#car_make", Input).focus()
@@ -662,20 +746,26 @@ class AddCarModal(ModalScreen):
             self.query_one("#car_km", Input).value,
             self.query_one("#car_fee", Input).value,
         )
-        result = addCar(*vals)
 
-        if result[0]:
-            self.dismiss()
+        if "" in vals:
+            self.query_one("#result", Label).update("Please enter all data.")
         else:
-            self.query_one("#result", Label).update(result[1])
+            result = addCar(*vals)
+
+            if result[0]:
+                self.dismiss()
+            else:
+                self.query_one("#result", Label).update(result[1])
 
     def action_cancel(self) -> None:
         self.dismiss()
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "submit":
+            event.stop()
             self.action_submit()
         else:
+            event.stop()
             self.action_cancel()
 
 
@@ -692,27 +782,47 @@ class AddRentalModal(ModalScreen):
         ]
 
     def compose(self) -> ComposeResult:
-        yield Label("Add Rental", id="title")
+        with Vertical(classes="dialog"):
 
-        yield Label("Renter (Employee)")
-        yield Select(options=self._employee_options, id="renter_id")
+            with VerticalScroll(id="form"):
+                yield Label("Add Rental", id="title")
 
-        yield Label("Rentee ID (customer/user id)")
-        yield Select(options=self._user_options, id="rentee_id")
+                yield Label("Renter (Employee)", classes="field-label")
+                yield Select(
+                    options=self._employee_options,
+                    id="renter_id",
+                    classes="field-input",
+                )
 
-        yield Label("Vehicle ID")
-        yield Select(options=self._car_options, id="vehicle_id")
+                yield Label("Rentee ID (customer/user id)", classes="field-label")
+                yield Select(
+                    options=self._user_options, id="rentee_id", classes="field-input"
+                )
 
-        yield Label("Rental Start")
-        yield Input(placeholder="Format: YYYY-MM-DD", id="rental_start")
+                yield Label("Vehicle ID", classes="field-label")
+                yield Select(
+                    options=self._car_options, id="vehicle_id", classes="field-input"
+                )
 
-        yield Label("Rental End")
-        yield Input(placeholder="Format: YYYY-MM-DD", id="rental_end")
+                yield Label("Rental Start", classes="field-label")
+                yield Input(
+                    placeholder="Format: YYYY-MM-DD",
+                    id="rental_start",
+                    classes="field-input",
+                )
 
-        yield Button("Submit", id="submit", variant="primary")
-        yield Button("Cancel", id="cancel")
+                yield Label("Rental End", classes="field-label")
+                yield Input(
+                    placeholder="Format: YYYY-MM-DD",
+                    id="rental_end",
+                    classes="field-input",
+                )
 
-        yield Label("", id="result")
+            with Horizontal(id="buttons"):
+                yield Button("Submit", id="submit", variant="primary")
+                yield Button("Cancel", id="cancel")
+
+            yield Label("", id="result")
 
     def on_mount(self) -> None:
         self.query_one("#renter_id", Select).focus()
@@ -726,20 +836,25 @@ class AddRentalModal(ModalScreen):
             self.query_one("#rental_end", Input).value,
         )
 
-        result = addRental(*vals)
-
-        if result[0]:
-            self.dismiss()
+        if "" in vals:
+            self.query_one("#result", Label).update("Please enter all data.")
         else:
-            self.query_one("#result", Label).update(result[1])
+            result = addRental(*vals)
+
+            if result[0]:
+                self.dismiss()
+            else:
+                self.query_one("#result", Label).update(result[1])
 
     def action_cancel(self) -> None:
         self.dismiss(None)
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "submit":
+            event.stop()
             self.action_submit()
         else:
+            event.stop()
             self.action_cancel()
 
 
@@ -747,19 +862,25 @@ class ShowRevenueStatistics(ModalScreen):
     BINDINGS = [("enter", "ok", "Ok")]
 
     def compose(self) -> ComposeResult:
-        yield Label(
-            f"Total Revenue = Rp {float(getTotalRevenue()[0][0])}", id="total_rev"
-        )
-        yield Label(
-            f"Average Revenue = Rp {float(getAverageRevenue()[0][0])}", id="avg_rev"
-        )
-
-        yield Button("OK", id="ok")
+        with VerticalScroll(classes="dialog"):
+            yield Label(
+                f"Total Revenue = Rp {float(getTotalRevenue()[0][0])}",
+                id="total_rev",
+                classes="field-label",
+            )
+            yield Label(
+                f"Average Revenue = Rp {float(getAverageRevenue()[0][0])}",
+                id="avg_rev",
+                classes="field-label",
+            )
+            with Horizontal(id="buttons"):
+                yield Button("OK", id="ok")
 
     def action_ok(self) -> None:
         self.dismiss()
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
+        event.stop()
         self.dismiss()
 
 
