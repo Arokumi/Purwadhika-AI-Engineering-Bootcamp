@@ -524,6 +524,7 @@ class RentalsScreen(Screen):
 
         plot = self.query_one(PlotextPlot)
         plt = plot.plt
+
         data = np.array([x[0] for x in getDateDifference()])
         mean = np.mean(data)
         std_dev = np.std(data)
