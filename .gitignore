@@ -1,0 +1,6 @@
+# Ignore local virtual environments
+.venv/
+venv/
+*/.venv/
+*/venv/
+Capstone Project/Module 3/CinephileGPT/db/certificates
