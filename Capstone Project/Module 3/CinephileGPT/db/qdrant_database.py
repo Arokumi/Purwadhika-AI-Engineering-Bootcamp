@@ -1,8 +1,12 @@
-from qdrant_client import QdrantClient, models
+# Core Qdrant imports
+from qdrant_client import QdrantClient
 from qdrant_client.models import PointStruct
 from qdrant_client.http import models as qm
+
+# Other imports
 from dotenv import load_dotenv
 from langchain_openai import OpenAIEmbeddings
+from langchain.tools import tool
 import os  
 import csv 
 
@@ -15,11 +19,16 @@ load_dotenv(dotenv_path=r'D:\Github\Purwadhika-AI-Engineering-Bootcamp\Capstone 
 QDRANT_API_KEY = os.getenv("QDRANT_API_KEY")
 QDRANT_URL = os.getenv("QDRANT_URL")
 
+
+# Tools for Qdrant connection
+qdrant_tools = ["placeholder_for_qdrant_tool_1", "placeholder_for_qdrant_tool_2"]
+
+
 # Initialize Qdrant client
 client = QdrantClient(
-    url=QDRANT_URL,
-    api_key=QDRANT_API_KEY,
-    timeout=30
+    url = QDRANT_URL,
+    api_key = QDRANT_API_KEY,
+    timeout = 30
 )
 
 
@@ -57,16 +66,16 @@ if client.count("top_movies").count == 0:
         for index, row in enumerate(reader):
             
             payload = {
-                "Series_Title": row[1],
+                "Series_Title" : row[1],
                 "Released_Year": row[2],
-                "Certificate": row[3],
-                "Genre": row[5],
-                "Overview": row[7],
-                "Director": row[9],
-                "Star1": row[10],
-                "Star2": row[11],
-                "Star3": row[12],
-                "Star4": row[13],
+                "Certificate"  : row[3],
+                "Genre"        : row[5],
+                "Overview"     : row[7],
+                "Director"     : row[9],
+                "Star1"        : row[10],
+                "Star2"        : row[11],
+                "Star3"        : row[12],
+                "Star4"        : row[13],
             }
 
             row_string = ""
@@ -95,16 +104,26 @@ if client.count("top_movies").count == 0:
         # Upsload points to Qdrant
         try:
             client.upload_points(
-                collection_name="top_movies",
-                points=points,
-                batch_size=100,
-                parallel=1
+                collection_name = "top_movies",
+                points = points,
+                batch_size = 100,
+                parallel = 1
             )
 
         except Exception as e:
             print(f"Error during upsert: {e}")
 
     
+# =================================================================================================
+
+
+def get_qdrant_client():
+    return client
+
+
+# =================================================================================================
+
+
 # TESTING THE CONNECTION:
 if __name__ == "__main__":
     print(client.get_collections())

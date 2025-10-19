@@ -1,11 +1,15 @@
 import mysql.connector
 import os
 from dotenv import load_dotenv
+from langchain.tools import tool
 
 
 # Load environment variables from .env file
 load_dotenv(dotenv_path=r'D:\Github\Purwadhika-AI-Engineering-Bootcamp\Capstone Project\Module 3\cinephile-gpt.venv\.env')
 
+
+# Tools for MySQL connection
+mysql_tools = ["placeholder_for_mysql_tool_1", "placeholder_for_mysql_tool_2"]
 
 # Database connection configuration using Aiven (Saya mau coba-coba pakai Aiven)
 config = {
