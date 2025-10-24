@@ -21,7 +21,7 @@ QDRANT_URL = os.getenv("QDRANT_URL")
 
 
 # Tools for Qdrant connection
-qdrant_tools = ["placeholder_for_qdrant_tool_1", "placeholder_for_qdrant_tool_2"]
+qdrant_tools = []
 
 
 # Initialize Qdrant client
