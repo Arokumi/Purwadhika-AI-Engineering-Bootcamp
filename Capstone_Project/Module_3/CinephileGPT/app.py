@@ -1,7 +1,6 @@
 import streamlit as st
 import markdown_it as md
 from utils.api_keys import update_keys, update_path
-from agents.intern_agent import interact
 import base64
 import os
 
@@ -31,6 +30,8 @@ with open("certificates/ca.pem", "wb") as f:
 CA_CERT_PATH = "certificates/ca.pem"
 update_path(CA_CERT_PATH)
 
+# SECRETS HAVE BEEN UPDATED
+from agents.intern_agent import interact
 
 # --- DISPLAY CHAT HISTORY ---
 
