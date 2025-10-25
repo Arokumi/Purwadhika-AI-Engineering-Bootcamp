@@ -1,0 +1,40 @@
+# ---- CORE APP ----
+streamlit==1.50.0
+python-dotenv==1.1.1
+
+# ---- OPENAI / LLM ----
+openai==2.6.0
+tiktoken==0.12.0
+
+# ---- LANGCHAIN + LLM TOOLS ----
+langchain==0.3.27
+langchain-openai==0.3.35
+langchain-community==0.3.31
+langchain-qdrant==0.2.1
+langchain-text-splitters==0.3.11
+
+# ---- LANGGRAPH (your agent system) ----
+langgraph==0.6.10
+langgraph-checkpoint==2.1.2
+langgraph-prebuilt==0.6.4
+langgraph-sdk==0.2.9
+langsmith==0.4.37
+
+# ---- DATABASE + VECTOR DB ----
+mysql-connector-python==9.4.0
+qdrant-client==1.15.1
+
+# ---- DATA + UTILITIES ----
+pandas==2.3.3
+numpy==2.3.4
+regex==2025.10.23
+python-dateutil==2.9.0.post0
+
+# ---- FRONTEND UTILITIES ----
+markdown-it-py==4.0.0
+rich==14.2.0
+
+# ---- OPTIONAL SAFETY DEPENDENCIES USED INDIRECTLY ----
+pydantic==2.12.3
+pydantic-settings==2.11.0
+SQLAlchemy==2.0.44
