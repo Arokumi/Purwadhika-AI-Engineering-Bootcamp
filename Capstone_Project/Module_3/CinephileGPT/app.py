@@ -3,15 +3,18 @@ import markdown_it as md
 from utils.api_keys import update_keys, update_path
 import base64
 import os
+from utils.logger import log
 
 # --- PAGE SETUP ---
 st.set_page_config(page_title="Chatbot UI", layout="centered")
 st.title("🎥 CinephileGPT")
 
+
 # --- SESSION STATE ---
 # Keeps message history between reruns
 if "messages" not in st.session_state:
     st.session_state.messages = []
+
 
 # --- UPDATE API KEYS ---
 AVN_PASSWORD = st.secrets["AVN_PASSWORD"]
@@ -21,17 +24,27 @@ OPENAI_API_KEY = st.secrets["OPENAI_API_KEY"]
 
 update_keys(AVN_PASSWORD, QDRANT_API_KEY, QDRANT_URL, OPENAI_API_KEY)
 
+
 # --- CERTIFICATE FOR SQL ---
 os.makedirs("certificates", exist_ok=True)
 with open("certificates/ca.pem", "wb") as f:
     f.write(base64.b64decode(st.secrets["CA_PEM_B64"]))
 
+
 # Certificate path
 CA_CERT_PATH = "certificates/ca.pem"
 update_path(CA_CERT_PATH)
 
+
 # SECRETS HAVE BEEN UPDATED
 from agents.intern_agent import interact
+
+
+# --- CONSOLE SIDEBAR ---
+st.sidebar.title("Console Logs")
+
+if "console" not in st.session_state:
+        st.session_state.console = []
 
 # --- DISPLAY CHAT HISTORY ---
 
@@ -78,6 +91,7 @@ h1, h2, h3 {
 """, unsafe_allow_html=True)
 
 
+# --- MESSAGES BETWEEN USER AND AI ---
 for msg in st.session_state.messages:
     # User messages on the right
     if msg["role"] == "user":
@@ -92,6 +106,16 @@ for msg in st.session_state.messages:
             unsafe_allow_html=True
         )
 
+# --- RENDER CONSOLE LOGS ---
+if "console" not in st.session_state:
+    st.session_state.console = []
+
+console_area = st.sidebar.empty()
+console_area.markdown(
+    "### Console Output\n```\n" + "\n".join(st.session_state.console) + "\n```"
+)
+
+
 # --- USER INPUT ---
 if prompt := st.chat_input("Type your message..."):
     # Save user input
@@ -104,6 +128,8 @@ if prompt := st.chat_input("Type your message..."):
 
 # --- RUN AI + SPINNER ---
 if st.session_state.get("show_spinner", False):
+
+    console_area = st.sidebar.empty()
 
     with st.spinner("🎬 CinephileGPT is thinking..."):
         ai_reply = interact(st.session_state.pending_prompt)

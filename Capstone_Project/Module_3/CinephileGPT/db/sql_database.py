@@ -107,16 +107,26 @@ def mysql_search_blank(blank: str, column: str, limit: int) -> str:
 
 
 @tool
-def mysql_filter_blank(filter_map: dict, limit: int) -> str:
+def mysql_filter_blank(filter_map: dict = None, limit: int = 5) -> str:
     """
-    Provided a filter map of all strings where each column key corresponds to a specific value:
-    {
-        "Genre": "Horror"
-        "IMDB_Rating: "> 7.8"
-        "...": "..."
-    }
-    provides a list of movies matching those filter results. For comparators, pair them together with the values like "> 7.8"
+    Provided a filter map of all strings where each column key corresponds to a specific value.
+    Arguments:
+    - filter_map (dict): MUST be a dict. Example:
+        {
+            "Genre": "Horror",
+            "IMDB_Rating": "> 8.0",
+            "Released_Year": "< 1990"
+        }
+    - limit (int): Number of results to return.
+
+    This tool MUST be called with BOTH parameters.
     """
+    if filter_map is None:
+        return json.dumps({
+        "error": "Missing filter_map. Example: {'Genre': 'Horror', 'IMDB_Rating': '> 8.0'}"
+    })
+
+    
     clauses = []
     for key, value in filter_map.items():
         if ">" in value or "<" in value or "=" in value:
@@ -184,6 +194,23 @@ def mysql_get_movie_by_id(movie_id: int) -> str:
 def qdrant_get_poster(movie_id: int) -> str:
     """Get the poster of a movie based on its given id. Meant to be used in tandem with QDrant."""
     query = f"SELECT Poster_link FROM top_movies WHERE movie_id = {movie_id};"
+    return mysql_query_tool(query)
+
+
+@tool
+def qdrant_reranker(movie_id_tuple: tuple, order_by: str, desc: bool = True) -> str:
+    """
+    Provided a tuple of movie id's, rerank them by a specific/particular numeric metric such as rating or gross.
+    Meant to be paired with semantic tools when users want "top" movies that match a semantic prerequisite (a vibe or feeling).
+
+    - movie_id_tuple: a tuple of movie id integers.
+    - order_by: column name to order by
+    - desc: boolean to order in ascending or descending.
+    """
+
+    order = "DESC" if desc else "ASC"
+
+    query = f"SELECT * FROM top_movies WHERE movie_id IN {movie_id_tuple} ORDER BY {order_by} {order};"
     return mysql_query_tool(query)
 
 

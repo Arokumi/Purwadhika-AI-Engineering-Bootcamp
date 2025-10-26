@@ -10,7 +10,7 @@ from langchain.tools import tool
 import os  
 import csv 
 import json
-from db.sql_database import qdrant_get_poster
+from db.sql_database import qdrant_get_poster, qdrant_reranker
 from utils.api_keys import QDRANT_API_KEY, QDRANT_URL, OPENAI_API_KEY
 
 
@@ -284,7 +284,7 @@ def qdrant_get_id_by_title(title: str) -> str:
 
 
 # Tools for Qdrant connection
-qdrant_tools = [qdrant_vector_search, qdrant_vector_search_with_filter, qdrant_similarity_by_id, qdrant_get_id_by_title, qdrant_get_poster]
+qdrant_tools = [qdrant_vector_search, qdrant_vector_search_with_filter, qdrant_similarity_by_id, qdrant_get_id_by_title, qdrant_get_poster, qdrant_reranker]
 
 # TESTING THE CONNECTION:
 if __name__ == "__main__":

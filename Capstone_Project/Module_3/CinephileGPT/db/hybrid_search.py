@@ -23,13 +23,13 @@ def hybrid_intersection_top_movies(sql_json: str, qdrant_json: str) -> str:
         qdrant_json = qdrant_json
 
         # Load json strings as actual dictionaries
-        sql_data = json.loads(sql_json)      # List of dicts
+        sql_data = json.loads(sql_json)        # List of dicts
         qdrant_data = json.loads(qdrant_json)  # List of dicts
 
         # Extract IDs from Qdrant search results
         qdrant_ids = {item["id"] for item in qdrant_data}
 
-        # Intersect with SQL (uses movie_id or id depending on your column)
+        # Intersect with SQL
         intersection = [
             row for row in sql_data
             if str(row.get("movie_id")) in qdrant_ids or str(row.get("id")) in qdrant_ids

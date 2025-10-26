@@ -27,6 +27,7 @@ from db.sql_database import mysql_tools
 
 # API Key
 from utils.api_keys import OPENAI_API_KEY
+from utils.logger import log
 
 model = ChatOpenAI(model="gpt-4o", temperature=0, api_key=OPENAI_API_KEY)
 
@@ -54,23 +55,23 @@ TOOLS = {
 # Classifer node and function for the intern agent --------------------------------------
 
 def classify_response(state: State):
-    print("Classifying response...")
+    log("Classifying response...")
 
     # Access the current task from the state
     current_task = state.get("current_task", "No tasks provided.")
 
     # Task is classified as Numeric, Semantic, or Hybrid
-    is_numeric = is_numeric_task(current_task)
-    is_semantic = is_semantic_task(current_task)
+    # is_numeric = is_numeric_task(current_task)
+    # is_semantic = is_semantic_task(current_task)
 
-    if is_numeric and not is_semantic:
-        task_class = "Numeric"
-    elif is_semantic and not is_numeric:
-        task_class = "Semantic"
-    elif is_numeric and is_semantic:
-        task_class = "Hybrid"
-    else:
-        task_class = classify_with_llm(current_task)
+    # if is_numeric and not is_semantic:
+    #     task_class = "Numeric"
+    # elif is_semantic and not is_numeric:
+    #     task_class = "Semantic"
+    # elif is_numeric and is_semantic:
+    #     task_class = "Hybrid"
+    # else:
+    task_class = classify_with_llm(current_task)
 
     if task_class == "Unknown":
         system_prompt = SystemMessage(
@@ -97,7 +98,7 @@ def is_numeric_task(task: str) -> bool:
         "rating above", "rating below",
         "filter by", "sort by",
         ]
-    print("Checking for numeric keywords...")
+    log("Checking for numeric keywords...")
     for keyword in numeric_keywords:
         if keyword in task.lower():
             return True
@@ -115,7 +116,7 @@ def is_semantic_task(task: str) -> bool:
         "movies with similar", 
         "semantic", "meaning", "contextual", "vibe", "feeling"
     ]
-    print("Checking for semantic keywords...")
+    log("Checking for semantic keywords...")
     for keyword in semantic_keywords:
         if keyword in task.lower():
             return True
@@ -141,10 +142,11 @@ def classify_with_llm(task: str) -> Literal["Numeric", "Semantic", "Hybrid"]:
     "{task}"
     """
 
-    print("Classifying task with LLM...")
+    log("Classifying task with LLM...")
     response = model.invoke([HumanMessage(content=message)])
     classification = response.content.strip().strip('"')
     if classification in ["Numeric", "Semantic", "Hybrid"]:
+        log(f"User prompt has been classified as: {classification}")
         return classification
     else:
         return "Unknown"
@@ -154,7 +156,7 @@ def classify_with_llm(task: str) -> Literal["Numeric", "Semantic", "Hybrid"]:
 
 
 def intern_node(state: State):
-    print("Using intern node...")
+    log("Using intern node...")
     system_prompt =  SystemMessage(
         content="""
         For the previous user query:
@@ -173,20 +175,19 @@ def intern_node(state: State):
 
     try:
         if content.startswith("{") or content == "{\"tool_intent\": True}":
-            print("Intent detected.")
+            log("Intent detected.")
             return {"messages": [response], "tool_intent": True}
         else:
-            print("Intent not detected.")
+            log("Intent not detected.")
             return {"messages": [response], "tool_intent": False}
     except Exception:
-        print("Intent not detected.")
+        log("Intent not detected.")
         return {"messages": [response], "tool_intent": False}
 
 
 def tool_node(state: State):
-    print("Using tool node...")
+    log("Using tool node...")
     task_classification = state["task_classification"]
-    print(f"task has been classified as: {task_classification}")
     allowed_tools = TOOLS[task_classification]
     model_with_tools = model.bind_tools(allowed_tools)
     
@@ -194,6 +195,7 @@ def tool_node(state: State):
         content="""
         Given the previous prompt, please use the appropriate tools to answer it. Include your reasoning steps for using the tools.
         You can use tools sequentally. If you no longer need tools, just provide a reply without attaching a tool call.
+        Limit yourself to 4 total tool calls to answer a single user query.
 
         For context here are all available columns from the databases:
         movie_id, Poster_Link, Series_Title, Released_Year, Certificate, Runtime, Genre, IMDB_Rating, Overview, Meta_score, Director, Star1, Star2, Star3, Star4, No_of_Votes, Gross
@@ -215,7 +217,8 @@ def tool_node(state: State):
         for tool in allowed_tools:
 
             if tool.name == tool_name:
-
+                log(f"Using tool: {tool_name}")
+                log(f"Planned arguments: {tool_args}")
                 # Special case for hybrid tool calling
                 if tool.name == "hybrid_intersection_top_movies":
                     sql_json = state.get("last_sql_result", [])[-1] if state.get("last_sql_result") else None
@@ -254,7 +257,7 @@ def tool_node(state: State):
 # Checks if the ReAct agent should loop  --------------------------------------
 
 def should_continue(state: State) -> bool:
-    print("Checking if CinephileGPT should continue...")
+    log("Checking if CinephileGPT should continue...")
     last_message = state["messages"][-1]
     calls_present = getattr(last_message, "tool_calls", False) or last_message.additional_kwargs.get("tool_calls", False) or isinstance(last_message, ToolMessage)
     return bool(calls_present) # If there are tool calls, continue the loop
@@ -275,7 +278,7 @@ def safe_invoke(model, messages):
             return model.invoke(messages)
         except RateLimitError as e:
             wait = 5
-            print(f"Rate limit hit, retrying in {wait} seconds...")
+            log(f"Rate limit hit, retrying in {wait} seconds...")
             time.sleep(wait)
 
 
@@ -334,40 +337,40 @@ app.invoke({"messages": [system_prompt]}, config={"configurable": {"thread_id": 
 def interact(user_input: str) -> str:
     try:
         response = app.invoke({"messages": [HumanMessage(content=user_input)], "current_task": user_input}, config={"configurable": {"thread_id": "cinephile_cli"}}) 
-        # print("CinephileGPT: ", response["messages"][-1].content)
+        # log("CinephileGPT: ", response["messages"][-1].content)
         return response["messages"][-1].content
            
     except Exception as e:
         # Fallback error handling
-        print(f"Exception detected: {e}")
+        log(f"Exception detected: {e}")
         return traceback.print_exc()
 
-if __name__ == "__main__":
+if __name__ == "__main__": 
     messages_list = []
-    print("\n \n-------------------------------------------- \n \n")
-    print("CinephileGPT Intern Agent is ready to assist you with movie-related tasks. Enter your task for the intern agent (or type 'exit' to quit).")
+    log("\n \n-------------------------------------------- \n \n")
+    log("CinephileGPT Intern Agent is ready to assist you with movie-related tasks. Enter your task for the intern agent (or type 'exit' to quit).")
     while True:
         try:
             user_input = input("User: ")
             if user_input.lower() == 'exit':
-                print("Exiting the intern agent.")
+                log("Exiting the intern agent.")
                 break
 
             elif user_input.lower() == "print":
-                print("State:")
-                print(messages_list)
+                log("State:")
+                log(messages_list)
 
             else:
                 response = app.invoke({"messages": [HumanMessage(content=user_input)], "current_task": user_input}, config={"configurable": {"thread_id": "cinephile_cli"}}) 
-                print("CinephileGPT: ", response["messages"][-1].content)
+                log("CinephileGPT: ", response["messages"][-1].content)
                 messages_list = response["messages"]
 
 
         except Exception as e:
             # Fallback error handling
-            print(f"Exception detected: {e}")
+            log(f"Exception detected: {e}")
             traceback.print_exc()
             # user_input = "Recommend me the top 5 movies of all time."
             # response = app.invoke({"messages": [HumanMessage(content=user_input)], "current_task": user_input}, config={"configurable": {"thread_id": "cinephile_cli"}}) 
-            # print("CinephileGPT: ", response["messages"][-1].content)
+            # log("CinephileGPT: ", response["messages"][-1].content)
 
