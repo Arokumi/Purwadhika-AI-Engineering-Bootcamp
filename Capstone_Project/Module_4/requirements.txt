@@ -54,7 +54,6 @@ mysql-connector-python==9.4.0
 narwhals==2.9.0
 numpy==2.3.4
 openai==2.6.0
-opencv-python-headless
 orjson==3.11.4
 ormsgpack==1.11.0
 packaging==25.0
@@ -100,6 +99,7 @@ watchdog==6.0.0
 xxhash==3.6.0
 yarl==1.22.0
 zstandard==0.25.0
+opencv-python-headless==4.10.0.84
 
 
 
