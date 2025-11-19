@@ -5,3 +5,4 @@ venv/
 */venv/
 Capstone Project/Module 3/CinephileGPT/db/certificates
 .streamlit/
+runs/detect/vehicle-detection/baseline_model_gtx1650/
