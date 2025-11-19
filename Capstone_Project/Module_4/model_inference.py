@@ -3,7 +3,7 @@ import cv2
 import numpy as np
 
 # Load the trained model
-model  = YOLO(r"runs\detect\vehicle-detection\baseline_model_gtx1650_12s\weights\best.pt")
+model  = YOLO(r"runs/detect/vehicle-detection/baseline_model_gtx1650_12s/weights/best.pt")
 
 
 # Move model to GPU if available
