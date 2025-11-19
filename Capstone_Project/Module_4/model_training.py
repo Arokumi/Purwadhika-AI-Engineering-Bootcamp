@@ -1,10 +1,14 @@
 from ultralytics import YOLO
+import torch
 from pathlib import Path
 import os
 
 
-training_path = "~/Documents/vehicle-detection.v1i.yolov12"
-p = Path(training_path).expanduser()
+# training_path = "~/Documents/vehicle-detection.v1i.yolov12"
+# p = Path(training_path).expanduser()
+
+path = r"C:\Users\aam71\Desktop\vehicle-detection.v1i.yolov12"
+data_yaml_path = os.path.join(path, "data.yaml")
 
 
 # Once ran, this return the following results:
@@ -38,24 +42,39 @@ def check_dataset():
 
 
 if __name__ == "__main__":
-    # check_dataset() | Already run
+    # print("Checking dataset class distribution...")
 
+    # I wont do any data augmentation since the dataset is already heavily augmented.
+    # If I did, I would risk overfitting to the augmented data. Or augmenting already augmented data, creating unrealistic samples.
+    # Hence, I proceed to train the model using oversampling of the minority classes ('van' and 'bus') to balance the class representation.
+    # ONLY IF the baseline model does not perform well.
 
-    # We wont do any data augmentation since the dataset is already heavily augmented.
-    # If we did, we would risk overfitting to the augmented data. Or augmenting already augmented data, creating unrealistic samples.
-    # Hence, we proceed to train the model using oversampling of the minority classes ('van' and 'bus') to balance the class representation.
+    # Make GPU the default if available
+    if torch.cuda.is_available():
+        device = 0  # GPU 0
+        print(f"Using CUDA device: {torch.cuda.get_device_name(device)}")
+    else:
+        device = "cpu"
+        print("CUDA not available, using CPU.")
 
+    # Load pre-trained YOLOv12 medium model
+    model = YOLO("yolo12s.pt")
 
-
-
-
-    # Train the model
-    model = YOLO("yolo12m.pt")
+    # --- SAFER SETTINGS FOR GTX 1650 (4GB-ish VRAM) | With consultation from ChatGPT ---
+    EPOCHS = 30       # start with 50 to test; increase to 80–100 later
+    IMG_SIZE = 512    # 640, standard for YOLO
+    BATCH = 8         # safer than 16 for a 1650
 
     results = model.train(
-        data="vehicle-detection.v1i.yolov12/data.yaml",
-        epochs=100,
-        imgsz=640,
-        batch=16,
-        name="vehicle-detection.v1i.yolov12/exp1",
+        data=data_yaml_path,
+        epochs=EPOCHS,
+        imgsz=IMG_SIZE,
+        batch=BATCH,
+        name="vehicle-detection/baseline_model_gtx1650_12s",
+        device=device,       # use GPU 0
+        workers=4,           # use 2 to reduce dataloader workers to keep system smooth
+        cache=False,         # keep RAM usage sane
+        exist_ok=True,       # overwrite if folder exists
     )
+
+    print("Training finished. Best weights saved to:", results.save_dir)
